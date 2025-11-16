@@ -48,6 +48,56 @@
             width: 100%; 
             box-sizing: border-box;
         }
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genesis Wallet (Carteira GEN)</title>
+    <style>
+        /* 1. CSS Base e Variáveis */
+        :root {
+            --cor-primaria: #4CAF50; /* Verde GEN */
+            --cor-secundaria: #333;
+            --cor-alerta: #CC0000;
+            --cor-fundo: #f4f4f9;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 800px;
+            margin: 0 auto; 
+            padding: 1.5rem; 
+            background-color: var(--cor-fundo);
+            color: var(--cor-secundaria);
+            line-height: 1.6;
+        }
+
+        /* 2. CORREÇÃO DE TAMANHO DE FONTES */
+        h1 { font-size: 2rem; color: var(--cor-primaria); }
+        h2 { font-size: 1.5rem; color: var(--cor-primaria); margin-top: 1.5rem; }
+
+        #saldo-atual { 
+            font-size: 3em; 
+            font-weight: 700; 
+            margin-top: 0.5rem; 
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        input[type="file"], button {
+            padding: 10px 15px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%; 
+            box-sizing: border-box;
+        }
 
         input[type="file"] {
             background-color: #fff;
@@ -74,7 +124,6 @@
             border-radius: 8px; 
             background-color: #ffffff;
             transition: box-shadow 0.2s;
-            /* Garante que o texto quebre dentro do contêiner */
             word-wrap: break-word;
             white-space: normal;
         }
@@ -88,6 +137,16 @@
             border-left: 5px solid var(--cor-alerta);
         }
         
+        /* NOVO ESTILO PARA INSTRUÇÃO */
+        .instrucao-importante {
+            background-color: #ffeccf;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
         /* 4. RESPONSIVIDADE (Para Telas Pequenas) */
         @media (max-width: 600px) {
             body {
@@ -117,6 +176,12 @@
     <hr>
 
     <h2>Adicionar Key Blocks</h2>
+    
+    <!-- INSTRUÇÃO CLARA PARA O USUÁRIO -->
+    <div class="instrucao-importante">
+        <strong>⚠️ Importante:</strong> Para calcular o saldo corretamente, você deve selecionar <strong>TODOS</strong> os seus arquivos de bloco (.txt) de uma só vez. A carteira não armazena arquivos localmente.
+    </div>
+    
     <input type="file" id="file-input" multiple accept=".txt" />
     <button onclick="iniciarLeitura()">Analisar Blocos</button>
 
@@ -141,6 +206,7 @@
                 return;
             }
 
+            // RESET DE ESTADO (NECESSÁRIO PARA O CÁLCULO DE PoFO)
             saldoTotal = 0.0;
             blocosCarregados = {};
             listaBlocos.innerHTML = '';
@@ -153,6 +219,7 @@
                 reader.readAsText(file);
             });
             
+            // Pausa (melhoria futura: usar Promises)
             setTimeout(atualizarUI, 500); 
         }
 
