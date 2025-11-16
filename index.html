@@ -48,56 +48,6 @@
             width: 100%; 
             box-sizing: border-box;
         }
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genesis Wallet (Carteira GEN)</title>
-    <style>
-        /* 1. CSS Base e Variáveis */
-        :root {
-            --cor-primaria: #4CAF50; /* Verde GEN */
-            --cor-secundaria: #333;
-            --cor-alerta: #CC0000;
-            --cor-fundo: #f4f4f9;
-        }
-
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 800px;
-            margin: 0 auto; 
-            padding: 1.5rem; 
-            background-color: var(--cor-fundo);
-            color: var(--cor-secundaria);
-            line-height: 1.6;
-        }
-
-        /* 2. CORREÇÃO DE TAMANHO DE FONTES */
-        h1 { font-size: 2rem; color: var(--cor-primaria); }
-        h2 { font-size: 1.5rem; color: var(--cor-primaria); margin-top: 1.5rem; }
-
-        #saldo-atual { 
-            font-size: 3em; 
-            font-weight: 700; 
-            margin-top: 0.5rem; 
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #fff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        input[type="file"], button {
-            padding: 10px 15px;
-            margin: 8px 0;
-            border-radius: 5px;
-            border: none;
-            font-size: 1rem;
-            cursor: pointer;
-            width: 100%; 
-            box-sizing: border-box;
-        }
 
         input[type="file"] {
             background-color: #fff;
@@ -202,11 +152,11 @@
             const files = fileInput.files;
             
             if (files.length === 0) {
-                alert("Selecione um ou mais arquivos de bloco (.txt).");
+                // Em vez de alert(), usamos console.error e um elemento visual, se possível, mas mantendo a simplicidade aqui.
+                console.error("Selecione um ou mais arquivos de bloco (.txt).");
                 return;
             }
 
-            // RESET DE ESTADO (NECESSÁRIO PARA O CÁLCULO DE PoFO)
             saldoTotal = 0.0;
             blocosCarregados = {};
             listaBlocos.innerHTML = '';
@@ -223,6 +173,16 @@
             setTimeout(atualizarUI, 500); 
         }
 
+        function extrairValorNumerico(valor) {
+            if (!valor) return 0.0;
+            // 1. Remove qualquer texto não numérico (como "GEN" ou espaços)
+            const numerico = valor.replace(/[^\d\.]/g, ''); 
+            // 2. Tenta converter para float
+            const resultado = parseFloat(numerico);
+            // 3. Retorna 0.0 se for NaN
+            return isNaN(resultado) ? 0.0 : resultado;
+        }
+
         function processarConteudoBloco(conteudoBloco, nomeArquivo) {
             const dados = {};
             const linhas = conteudoBloco.split('\n');
@@ -235,9 +195,14 @@
                 }
             });
 
-            // 2. Análise PoFO
+            // 2. Análise PoFO e **CORREÇÃO DE EXTRAÇÃO DO SALDO**
             const idBloco = dados.ID_BLOCO;
-            let saldoBloco = parseFloat(dados.RECOMPENSA_MINERACAO || dados.RECOMPENSA_INICIAL || dados.RECOMPENSA_TRANSFERENCIA || '0.0');
+            
+            // Tenta obter o valor bruto
+            let valorBruto = dados.RECOMPENSA_MINERACAO || dados.RECOMPENSA_INICIAL || dados.RECOMPENSA_TRANSFERENCIA || '0.0';
+
+            // Usa a nova função de extração segura
+            let saldoBloco = extrairValorNumerico(valorBruto);
             
             let ativo = saldoBloco > 0;
             
@@ -245,18 +210,22 @@
             let valido = true;
             if (idBloco !== '0' && !dados.PROVA_K_SECRETA) {
                  valido = false;
-                 console.warn(`Bloco ${idBloco} inválido: Falta K_SECRETA.`);
+                 console.warn(`Bloco ${idBloco} inválido: Falta PROVA_K_SECRETA.`);
             }
 
             // 4. Acumular Saldo
             if (ativo && valido) {
                 saldoTotal += saldoBloco;
+            } else if (saldoBloco > 0 && !ativo) {
+                 // Deve ser zero se inativo, mas o valor é maior que zero? Isso indica um problema
+                 console.error(`Bloco ${idBloco} (Arquivo: ${nomeArquivo}) tem saldo ${saldoBloco} mas está inativo. Ignorado no saldo total.`);
             }
-            
+
             // 5. Armazenar e Exibir
             const status = ativo ? 'Ativo' : 'INATIVO (Valor 0)';
             const classe = ativo ? '' : 'inativo';
-            const recompensaTexto = saldoBloco.toFixed(1) + ' GEN';
+            // Usa o saldoBloco já formatado (se fosse o caso de ter mais casas decimais)
+            const recompensaTexto = saldoBloco.toFixed(1) + ' GEN'; 
             const hashExibicao = dados.HASH_BLOCO_ATUAL ? dados.HASH_BLOCO_ATUAL.substring(0, 10) + '...' : 'N/A';
 
             listaBlocos.innerHTML += `
@@ -274,7 +243,7 @@
             document.getElementById('saldo-atual').textContent = saldoTotal.toFixed(1) + ' GEN';
             const cor = saldoTotal === 0.0 ? 'var(--cor-alerta)' : 'var(--cor-primaria)';
             document.getElementById('saldo-atual').style.color = cor;
-            console.log("Todos os blocos carregados:", blocosCarregados);
+            console.log("Todos os blocos carregados e saldo total:", saldoTotal.toFixed(1));
         }
 
         // --- INTEGRAÇÃO FIREBASE E LÓGICA DE TRANSAÇÃO VÃO AQUI ---
@@ -282,3 +251,5 @@
     </script>
 </body>
 </html>
+
+
