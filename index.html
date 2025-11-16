@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+7<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -108,6 +108,158 @@
             
             #saldo-atual {
                 font-size: 2em;
+            }
+            
+            input[type="file"], button {
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔑 Genesis Wallet (Carteira GEN)</h1>
+    <p>Use esta interface para adicionar seus Key Blocks e verificar seu saldo.</p>
+
+    <h2>Saldo Atual de GEN:</h2>
+    <div id="saldo-atual">0.0 GEN</div>
+    
+    <hr>
+
+    <h2>Adicionar Key Blocks</h2>
+    
+    <!-- INSTRUÇÃO CLARA PARA O USUÁRIO -->
+    <div class="instrucao-importante">
+        <strong>⚠️ Importante:</strong> Para calcular o saldo corretamente, você deve selecionar <strong>TODOS</strong> os seus arquivos de bloco (.txt) de uma só vez. A carteira não armazena arquivos localmente.
+    </div>
+    
+    <input type="file" id="file-input" multiple accept=".txt" />
+    <button onclick="iniciarLeitura()">Analisar Blocos</button>
+
+    <hr>
+
+    <h2>Blocos em Sua Posse:</h2>
+    <div id="lista-blocos">Nenhum bloco carregado.</div>
+
+    <script>
+        let saldoTotal = 0.0;
+        let blocosCarregados = {};
+        const listaBlocos = document.getElementById('lista-blocos');
+        
+        // --- FUNÇÃO DE LEITURA E PROCESSAMENTO ---
+
+        function iniciarLeitura() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                console.error("Selecione um ou mais arquivos de bloco (.txt).");
+                return;
+            }
+
+            saldoTotal = 0.0;
+            blocosCarregados = {};
+            listaBlocos.innerHTML = '';
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    processarConteudoBloco(event.target.result, file.name);
+                };
+                reader.readAsText(file);
+            });
+            
+            setTimeout(atualizarUI, 500); 
+        }
+
+        /**
+         * FUNÇÃO CORRIGIDA: Extrai o valor numérico de uma string,
+         * lidando com vírgulas decimais e removendo texto como "GEN".
+         */
+        function extrairValorNumerico(valor) {
+            if (!valor) return 0.0;
+            
+            // 1. Garante que o valor seja uma string e remove espaços extras
+            let strValor = String(valor).trim();
+            
+            // 2. Tenta substituir vírgula (,) por ponto (.) para padronizar decimais
+            strValor = strValor.replace(',', '.');
+            
+            // 3. Remove TUDO que NÃO É dígito ou ponto decimal (incluindo " GEN", letras, etc.)
+            const numerico = strValor.replace(/[^\d\.]/g, ''); 
+            
+            // 4. Converte para float de forma segura
+            const resultado = parseFloat(numerico);
+            
+            return isNaN(resultado) ? 0.0 : resultado;
+        }
+
+        function processarConteudoBloco(conteudoBloco, nomeArquivo) {
+            const dados = {};
+            const linhas = conteudoBloco.split('\n');
+            
+            // 1. Extração de Dados
+            linhas.forEach(linha => {
+                if (linha.includes(':') && !linha.startsWith('#')) {
+                    const [chave, valor] = linha.split(':', 2);
+                    dados[chave.trim()] = valor.trim();
+                }
+            });
+
+            // 2. Análise PoFO e Extração do Saldo
+            const idBloco = dados.ID_BLOCO;
+            
+            // Tenta obter o valor bruto de qualquer chave de recompensa
+            let valorBruto = dados.RECOMPENSA_MINERACAO || dados.RECOMPENSA_INICIAL || dados.RECOMPENSA_TRANSFERENCIA || '0.0';
+
+            // Usa a função de extração segura e robusta
+            let saldoBloco = extrairValorNumerico(valorBruto);
+            
+            let ativo = saldoBloco > 0;
+            
+            // 3. Validação (Blocos Chave devem ter K_SECRETA)
+            let valido = true;
+            if (idBloco !== '0' && !dados.PROVA_K_SECRETA) {
+                 valido = false;
+                 console.warn(`Bloco ${idBloco} inválido: Falta PROVA_K_SECRETA.`);
+            }
+
+            // 4. Acumular Saldo
+            if (ativo && valido) {
+                saldoTotal += saldoBloco;
+            } else if (saldoBloco > 0 && !ativo) {
+                 console.error(`Bloco ${idBloco} (Arquivo: ${nomeArquivo}) tem saldo ${saldoBloco} mas está inativo. Ignorado no saldo total.`);
+            }
+
+            // 5. Armazenar e Exibir
+            const status = ativo ? 'Ativo' : 'INATIVO (Valor 0)';
+            const classe = ativo ? '' : 'inativo';
+            const recompensaTexto = saldoBloco.toFixed(1) + ' GEN'; 
+            const hashExibicao = dados.HASH_BLOCO_ATUAL ? dados.HASH_BLOCO_ATUAL.substring(0, 10) + '...' : 'N/A';
+
+            listaBlocos.innerHTML += `
+                <div class="bloco-item ${classe}">
+                    [ID ${idBloco}] **${nomeArquivo}**<br>
+                    Valor: **${recompensaTexto}** | Status: ${status}<br>
+                    Hash: ${hashExibicao}<br>
+                </div>
+            `;
+
+            blocosCarregados[idBloco] = { nome: nomeArquivo, saldo: saldoBloco, hash: dados.HASH_BLOCO_ATUAL, ativo: ativo, conteudo: conteudoBloco };
+        }
+
+        function atualizarUI() {
+            document.getElementById('saldo-atual').textContent = saldoTotal.toFixed(1) + ' GEN';
+            const cor = saldoTotal === 0.0 ? 'var(--cor-alerta)' : 'var(--cor-primaria)';
+            document.getElementById('saldo-atual').style.color = cor;
+            console.log("Todos os blocos carregados e saldo total:", saldoTotal.toFixed(1));
+        }
+
+        // --- INTEGRAÇÃO FIREBASE E LÓGICA DE TRANSAÇÃO VÃO AQUI ---
+
+    </script>
+</body>
+</html>
+
             }
             
             input[type="file"], button {
