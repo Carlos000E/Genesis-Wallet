@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genesis Wallet (Carteira GEN)</title>
+    <style>
+        /* 1. CSS Base e Variáveis */
+        :root {
+            --cor-primaria: #4CAF50; /* Verde GEN */
+            --cor-secundaria: #333;
+            --cor-alerta: #CC0000;
+            --cor-fundo: #f4f4f9;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 800px;
+            margin: 0 auto; 
+            padding: 1.5rem; 
+            background-color: var(--cor-fundo);
+            color: var(--cor-secundaria);
+            line-height: 1.6;
+        }
+
+        /* 2. CORREÇÃO DE TAMANHO DE FONTES */
+        h1 { font-size: 2rem; color: var(--cor-primaria); }
+        h2 { font-size: 1.5rem; color: var(--cor-primaria); margin-top: 1.5rem; }
+
+        #saldo-atual { 
+            font-size: 3em; 
+            font-weight: 700; 
+            margin-top: 0.5rem; 
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        input[type="file"], button {
+            padding: 10px 15px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%; 
+            box-sizing: border-box;
+        }
+
+        input[type="file"] {
+            background-color: #fff;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: var(--cor-primaria);
+            color: white;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        hr { border-top: 1px solid #ddd; margin: 1.5rem 0; }
+
+        .bloco-item { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 8px; 
+            background-color: #ffffff;
+            transition: box-shadow 0.2s;
+            /* Garante que o texto quebre dentro do contêiner */
+            word-wrap: break-word;
+            white-space: normal;
+        }
+        
+        .bloco-item:hover {
+             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .inativo { 
+            opacity: 0.6; 
+            border-left: 5px solid var(--cor-alerta);
+        }
+        
+        /* 4. RESPONSIVIDADE (Para Telas Pequenas) */
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem;
+            }
+            
+            h1 { font-size: 1.8rem; }
+            h2 { font-size: 1.4rem; }
+            
+            #saldo-atual {
+                font-size: 2em;
+            }
+            
+            input[type="file"], button {
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔑 Genesis Wallet (Carteira GEN)</h1>
+    <p>Use esta interface para adicionar seus Key Blocks e verificar seu saldo.</p>
+
+    <h2>Saldo Atual de GEN:</h2>
+    <div id="saldo-atual">0.0 GEN</div>
+    
+    <hr>
+
+    <h2>Adicionar Key Blocks</h2>
+    <input type="file" id="file-input" multiple accept=".txt" />
+    <button onclick="iniciarLeitura()">Analisar Blocos</button>
+
+    <hr>
+
+    <h2>Blocos em Sua Posse:</h2>
+    <div id="lista-blocos">Nenhum bloco carregado.</div>
+
+    <script>
+        let saldoTotal = 0.0;
+        let blocosCarregados = {};
+        const listaBlocos = document.getElementById('lista-blocos');
+        
+        // --- FUNÇÃO DE LEITURA E PROCESSAMENTO ---
+
+        function iniciarLeitura() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert("Selecione um ou mais arquivos de bloco (.txt).");
+                return;
+            }
+
+            saldoTotal = 0.0;
+            blocosCarregados = {};
+            listaBlocos.innerHTML = '';
+            
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    processarConteudoBloco(event.target.result, file.name);
+                };
+                reader.readAsText(file);
+            });
+            
+            setTimeout(atualizarUI, 500); 
+        }
+
+        function processarConteudoBloco(conteudoBloco, nomeArquivo) {
+            const dados = {};
+            const linhas = conteudoBloco.split('\n');
+            
+            // 1. Extração de Dados
+            linhas.forEach(linha => {
+                if (linha.includes(':') && !linha.startsWith('#')) {
+                    const [chave, valor] = linha.split(':', 2);
+                    dados[chave.trim()] = valor.trim();
+                }
+            });
+
+            // 2. Análise PoFO
+            const idBloco = dados.ID_BLOCO;
+            let saldoBloco = parseFloat(dados.RECOMPENSA_MINERACAO || dados.RECOMPENSA_INICIAL || dados.RECOMPENSA_TRANSFERENCIA || '0.0');
+            
+            let ativo = saldoBloco > 0;
+            
+            // 3. Validação (Blocos Chave devem ter K_SECRETA)
+            let valido = true;
+            if (idBloco !== '0' && !dados.PROVA_K_SECRETA) {
+                 valido = false;
+                 console.warn(`Bloco ${idBloco} inválido: Falta K_SECRETA.`);
+            }
+
+            // 4. Acumular Saldo
+            if (ativo && valido) {
+                saldoTotal += saldoBloco;
+            }
+            
+            // 5. Armazenar e Exibir
+            const status = ativo ? 'Ativo' : 'INATIVO (Valor 0)';
+            const classe = ativo ? '' : 'inativo';
+            const recompensaTexto = saldoBloco.toFixed(1) + ' GEN';
+            const hashExibicao = dados.HASH_BLOCO_ATUAL ? dados.HASH_BLOCO_ATUAL.substring(0, 10) + '...' : 'N/A';
+
+            listaBlocos.innerHTML += `
+                <div class="bloco-item ${classe}">
+                    [ID ${idBloco}] **${nomeArquivo}**<br>
+                    Valor: **${recompensaTexto}** | Status: ${status}<br>
+                    Hash: ${hashExibicao}<br>
+                </div>
+            `;
+
+            blocosCarregados[idBloco] = { nome: nomeArquivo, saldo: saldoBloco, hash: dados.HASH_BLOCO_ATUAL, ativo: ativo, conteudo: conteudoBloco };
+        }
+
+        function atualizarUI() {
+            document.getElementById('saldo-atual').textContent = saldoTotal.toFixed(1) + ' GEN';
+            const cor = saldoTotal === 0.0 ? 'var(--cor-alerta)' : 'var(--cor-primaria)';
+            document.getElementById('saldo-atual').style.color = cor;
+            console.log("Todos os blocos carregados:", blocosCarregados);
+        }
+
+        // --- INTEGRAÇÃO FIREBASE E LÓGICA DE TRANSAÇÃO VÃO AQUI ---
+
+    </script>
+</body>
+</html>
